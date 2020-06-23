@@ -6,20 +6,21 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
-
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+
+import 'src/closed_caption_file.dart';
+
 export 'package:video_player_platform_interface/video_player_platform_interface.dart'
     show DurationRange, DataSourceType, VideoFormat;
 
-import 'src/closed_caption_file.dart';
 export 'src/closed_caption_file.dart';
 
 final VideoPlayerPlatform _videoPlayerPlatform = VideoPlayerPlatform.instance
-  // This will clear all open videos on the platform when a full restart is
-  // performed.
+// This will clear all open videos on the platform when a full restart is
+// performed.
   ..init();
 
 /// The duration, current position, buffering state, error state and settings
@@ -374,6 +375,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
     if (value.isPlaying) {
       await _videoPlayerPlatform.play(_textureId);
+      _timer?.cancel();
       _timer = Timer.periodic(
         const Duration(milliseconds: 500),
         (Timer timer) async {
@@ -384,7 +386,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           if (_isDisposed) {
             return;
           }
-          _updatePosition(newPosition);
+          // fix: newPosition could greater than duration
+          if (newPosition > value.duration) {
+            print('video player $newPosition ${value.duration} 播放完了');
+            await pause();
+            await seekTo(Duration(seconds: 0));
+            value = value.copyWith(position: Duration(seconds: 0));
+          } else {
+            _updatePosition(newPosition);
+          }
         },
       );
     } else {
@@ -475,22 +485,69 @@ class _VideoAppLifeCycleObserver extends Object with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.paused:
-        _wasPlayingBeforePause = _controller.value.isPlaying;
-        _controller.pause();
-        break;
-      case AppLifecycleState.resumed:
-        if (_wasPlayingBeforePause) {
-          _controller.play();
-        }
-        break;
-      default:
+    if (Platform.isIOS){
+      _iosDidChangeAppLifecycleState(state);
+    } else {
+      switch (state) {
+        case AppLifecycleState.paused:
+          _wasPlayingBeforePause = _controller.value.isPlaying;
+          _controller.pause();
+          break;
+        case AppLifecycleState.resumed:
+          if (_wasPlayingBeforePause == true) {
+            _controller.play();
+          }
+          break;
+        default:
+      }
     }
+
   }
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _iosDebounceOnResumeTimer?.cancel();
+  }
+
+  bool _wasIosNotPlayingBeforePause;
+  Timer _iosDebounceOnResumeTimer;
+  /// fix:ios下拉状态栏再回来,播放器会变成空白,所以在resumed时先播放，
+  /// 再根据之前保存的状态来决定是否暂停 (todo能否原生层面优化？)
+  void _iosDidChangeAppLifecycleState(AppLifecycleState state) async {
+    if (_controller.value.duration == null) return;
+    print('${DateTime.now().toIso8601String()}---didChangeAppLifecycleState $state');
+    switch (state) {
+      case AppLifecycleState.inactive:
+        _iosDebounceOnResumeTimer?.cancel();
+        if (_wasIosNotPlayingBeforePause == null) {
+          _wasIosNotPlayingBeforePause = !_controller.value.isPlaying;
+          print('保存播放器状态 ${_wasIosNotPlayingBeforePause ? '暂停':'播放'}');
+        }
+        break;
+      case AppLifecycleState.paused:
+        await _controller.pause();
+        break;
+      case AppLifecycleState.resumed:
+        // 下拉状态栏会立刻触发 inactive -> resumed -> inactive
+        _iosDebounceOnResumeTimer?.cancel();
+        _iosDebounceOnResumeTimer = Timer(Duration(milliseconds: 100), () async {
+          await _controller.play();
+          if (_wasIosNotPlayingBeforePause == true) {
+            print('恢复播放器状态 ${_wasIosNotPlayingBeforePause ? '暂停':'播放'}');
+            var currentPosition = _controller.value.position;
+            var currentVolume = _controller.value.volume;
+            await _controller.setVolume(0);
+            await Future.delayed(Duration(milliseconds: 100));
+            await _controller.seekTo(currentPosition);
+            await _controller.pause();
+            await _controller.setVolume(currentVolume);
+          }
+          _wasIosNotPlayingBeforePause = null;
+        });
+
+        break;
+      default:
+    }
   }
 }
 
