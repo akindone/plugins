@@ -28,6 +28,8 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   @override
   Future<int> create(DataSource dataSource) async {
     CreateMessage message = CreateMessage();
+    message.timeout = dataSource.timeout;
+    //print('message.timeout=${message.timeout}');
 
     switch (dataSource.sourceType) {
       case DataSourceType.asset:
@@ -114,6 +116,8 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           return VideoEvent(eventType: VideoEventType.bufferingStart);
         case 'bufferingEnd':
           return VideoEvent(eventType: VideoEventType.bufferingEnd);
+        case 'copyPixelBufferTimeout':
+          return VideoEvent(eventType: VideoEventType.copyPixelBufferTimeout);
         default:
           return VideoEvent(eventType: VideoEventType.unknown);
       }

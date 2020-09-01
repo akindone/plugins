@@ -45,3 +45,6 @@ build/
 .project
 .classpath
 .settings
+packages/video_player/video_player/example/ios/Flutter/.last_build_id
+packages/video_player/video_player/example/ios/Flutter/Flutter.podspec
+packages/video_player/video_player/example/ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist

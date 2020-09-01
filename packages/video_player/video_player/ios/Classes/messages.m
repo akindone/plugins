@@ -84,6 +84,10 @@ static NSDictionary* wrapResult(NSDictionary *result, FlutterError *error) {
   if ((NSNull *)result.formatHint == [NSNull null]) {
     result.formatHint = nil;
   }
+  NSNumber *num = dict[@"timeout"];
+  if ([num isKindOfClass:[NSNumber class]]) {
+    result.timeout = num.doubleValue;
+  }
   return result;
 }
 -(NSDictionary*)toMap {

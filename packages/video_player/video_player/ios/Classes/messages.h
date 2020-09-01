@@ -19,7 +19,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong, nullable) NSNumber * textureId;
 @end
 
-@interface FLTCreateMessage : NSObject 
+@interface FLTCreateMessage : NSObject
+@property(nonatomic, assign) NSTimeInterval timeout;
 @property(nonatomic, copy, nullable) NSString * asset;
 @property(nonatomic, copy, nullable) NSString * uri;
 @property(nonatomic, copy, nullable) NSString * packageName;

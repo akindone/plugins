@@ -206,6 +206,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   int _textureId;
 
+  // ignore: public_member_api_docs
+  final double timeout = 3.0; //TODO
+
   /// The URI to the video file. This will be in different formats depending on
   /// the [DataSourceType] of the original video.
   final String dataSource;
@@ -254,6 +257,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       case DataSourceType.asset:
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.asset,
+          timeout: timeout,
           asset: dataSource,
           package: package,
         );
@@ -261,6 +265,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       case DataSourceType.network:
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.network,
+          timeout: timeout,
           uri: dataSource,
           formatHint: formatHint,
         );
@@ -268,6 +273,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       case DataSourceType.file:
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.file,
+          timeout: timeout,
           uri: dataSource,
         );
         break;
@@ -314,6 +320,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
         case VideoEventType.bufferingEnd:
           value = value.copyWith(isBuffering: false);
+          break;
+        case VideoEventType.copyPixelBufferTimeout:
+          //TODO
+          print('copyPixelBufferTimeout');
           break;
         case VideoEventType.unknown:
           break;

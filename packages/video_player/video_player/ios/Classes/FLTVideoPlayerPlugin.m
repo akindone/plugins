@@ -11,6 +11,8 @@
 #error Code Requires ARC.
 #endif
 
+#define WEAKSELF(weakSelf)  __weak __typeof(&*self)weakSelf = self;
+
 int64_t FLTCMTimeToMillis(CMTime time) {
   if (time.timescale == 0) return 0;
   return time.value * 1000 / time.timescale;
@@ -46,7 +48,9 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 @property(nonatomic, readonly) bool isPlaying;
 @property(nonatomic) bool isLooping;
 @property(nonatomic, readonly) bool isInitialized;
-- (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater;
+@property(nonatomic, strong) NSTimer *pixelBufferTimeoutTimer;
+@property(nonatomic, assign) NSTimeInterval pixelBufferTimeout;
+
 - (void)play;
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
@@ -60,9 +64,17 @@ static void* playbackBufferEmptyContext = &playbackBufferEmptyContext;
 static void* playbackBufferFullContext = &playbackBufferFullContext;
 
 @implementation FLTVideoPlayer
-- (instancetype)initWithAsset:(NSString*)asset frameUpdater:(FLTFrameUpdater*)frameUpdater {
+- (instancetype)initWithAsset:(NSString*)asset frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout {
   NSString* path = [[NSBundle mainBundle] pathForResource:asset ofType:nil];
-  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater];
+  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater timeout:timeout];
+}
+
+- (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout {
+    AVPlayerItem* item = [AVPlayerItem playerItemWithURL:url];
+    if (self = [self initWithPlayerItem:item frameUpdater:frameUpdater]) {
+        self.pixelBufferTimeout = timeout;
+    }
+    return self;
 }
 
 - (void)addObservers:(AVPlayerItem*)item {
@@ -160,11 +172,6 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
                                              selector:@selector(onDisplayLink:)];
   [_displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
   _displayLink.paused = YES;
-}
-
-- (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater {
-  AVPlayerItem* item = [AVPlayerItem playerItemWithURL:url];
-  return [self initWithPlayerItem:item frameUpdater:frameUpdater];
 }
 
 - (CGAffineTransform)fixTransform:(AVAssetTrack*)videoTrack {
@@ -291,15 +298,32 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (void)updatePlayingState {
-  if (!_isInitialized) {
-    return;
-  }
-  if (_isPlaying) {
-    [_player play];
-  } else {
-    [_player pause];
-  }
-  _displayLink.paused = !_isPlaying;
+    if (!_isInitialized) {
+        return;
+    }
+    //    if (@available(iOS 10.0, *)) {
+    //        if (self.player.timeControlStatus == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate) return;
+    //        self.player.automaticallyWaitsToMinimizeStalling = false;
+    //    } else {
+    //        // Fallback on earlier versions
+    //    }
+    
+    if (_isPlaying) {
+        [_player play];
+//        NSLog(@"copyPixelBuffer check");
+        _pixelBufferTimeoutTimer.fireDate = [NSDate dateWithTimeIntervalSinceNow:_pixelBufferTimeout];
+        
+    } else {
+        [_player pause];
+        _pixelBufferTimeoutTimer.fireDate = [NSDate distantFuture];
+    }
+    
+    if (_isPlaying) {
+        [_player play];
+    } else {
+        [_player pause];
+    }
+    _displayLink.paused = !_isPlaying;
 }
 
 - (void)sendInitialized {
@@ -324,7 +348,24 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
       @"width" : @(width),
       @"height" : @(height)
     });
+      
+    if (@available(iOS 10.0, *)) {
+      _pixelBufferTimeoutTimer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:false block:^(NSTimer * _Nonnull timer) {
+          WEAKSELF(weakSelf);
+          [weakSelf copyPixelBufferTimeout];
+      }];
+    } else {
+      // Fallback on earlier versions
+    }
+    _pixelBufferTimeoutTimer.fireDate = [NSDate distantFuture];
   }
+}
+
+- (void)copyPixelBufferTimeout {
+    if (_eventSink) {
+//        NSLog(@"copyPixelBufferTimeout");
+        _eventSink(@{@"event": @"copyPixelBufferTimeout"});
+    }
 }
 
 - (void)play {
@@ -362,8 +403,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 - (CVPixelBufferRef)copyPixelBuffer {
   CMTime outputItemTime = [_videoOutput itemTimeForHostTime:CACurrentMediaTime()];
   if ([_videoOutput hasNewPixelBufferForItemTime:outputItemTime]) {
-    return [_videoOutput copyPixelBufferForItemTime:outputItemTime itemTimeForDisplay:NULL];
+//      NSLog(@"copyPixelBuffer hasNew, %@", self.player.currentItem);
+      _pixelBufferTimeoutTimer.fireDate = [NSDate distantFuture];
+      return [_videoOutput copyPixelBufferForItemTime:outputItemTime itemTimeForDisplay:NULL];
   } else {
+//      NSLog(@"copyPixelBuffer NULL, %@", self.player.currentItem);
     return NULL;
   }
 }
@@ -395,23 +439,27 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 /// is useful for the case where the Engine is in the process of deconstruction
 /// so the channel is going to die or is already dead.
 - (void)disposeSansEventChannel {
-  _disposed = true;
-  [_displayLink invalidate];
-  [[_player currentItem] removeObserver:self forKeyPath:@"status" context:statusContext];
-  [[_player currentItem] removeObserver:self
-                             forKeyPath:@"loadedTimeRanges"
-                                context:timeRangeContext];
-  [[_player currentItem] removeObserver:self
-                             forKeyPath:@"playbackLikelyToKeepUp"
-                                context:playbackLikelyToKeepUpContext];
-  [[_player currentItem] removeObserver:self
-                             forKeyPath:@"playbackBufferEmpty"
-                                context:playbackBufferEmptyContext];
-  [[_player currentItem] removeObserver:self
-                             forKeyPath:@"playbackBufferFull"
-                                context:playbackBufferFullContext];
-  [_player replaceCurrentItemWithPlayerItem:nil];
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+    _disposed = true;
+    [_displayLink invalidate];
+    
+    [_pixelBufferTimeoutTimer invalidate];
+    _pixelBufferTimeoutTimer = nil;
+    
+    [[_player currentItem] removeObserver:self forKeyPath:@"status" context:statusContext];
+    [[_player currentItem] removeObserver:self
+                               forKeyPath:@"loadedTimeRanges"
+                                  context:timeRangeContext];
+    [[_player currentItem] removeObserver:self
+                               forKeyPath:@"playbackLikelyToKeepUp"
+                                  context:playbackLikelyToKeepUpContext];
+    [[_player currentItem] removeObserver:self
+                               forKeyPath:@"playbackBufferEmpty"
+                                  context:playbackBufferEmptyContext];
+    [[_player currentItem] removeObserver:self
+                               forKeyPath:@"playbackBufferFull"
+                                  context:playbackBufferFullContext];
+    [_player replaceCurrentItemWithPlayerItem:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)dispose {
@@ -487,6 +535,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 - (FLTTextureMessage*)create:(FLTCreateMessage*)input error:(FlutterError**)error {
   FLTFrameUpdater* frameUpdater = [[FLTFrameUpdater alloc] initWithRegistry:_registry];
   FLTVideoPlayer* player;
+  NSTimeInterval timeout = input.timeout;
   if (input.asset) {
     NSString* assetPath;
     if (input.packageName) {
@@ -494,12 +543,13 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     } else {
       assetPath = [_registrar lookupKeyForAsset:input.asset];
     }
-    player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater];
+    player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater timeout:timeout];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
+      
   } else if (input.uri) {
-    player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri]
-                                    frameUpdater:frameUpdater];
+    player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri] frameUpdater:frameUpdater timeout:timeout];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
+      
   } else {
     *error = [FlutterError errorWithCode:@"video_player" message:@"not implemented" details:nil];
     return nil;

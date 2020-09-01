@@ -147,6 +147,7 @@ class DataSource {
   /// package and null otherwise.
   DataSource({
     @required this.sourceType,
+    @required this.timeout,
     this.uri,
     this.formatHint,
     this.asset,
@@ -175,6 +176,9 @@ class DataSource {
   /// The package that the asset was loaded from. Only set for
   /// [DataSourceType.asset] videos.
   final String package;
+
+  // ignore: public_member_api_docs
+  final double timeout;
 }
 
 /// The way in which the video was originally loaded.
@@ -278,6 +282,9 @@ enum VideoEventType {
 
   /// The video stopped to buffer.
   bufferingEnd,
+
+  /// copyPixelBuffer timeout .
+  copyPixelBufferTimeout,
 
   /// An unknown event has been received.
   unknown,
