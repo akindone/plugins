@@ -205,6 +205,13 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         super(VideoPlayerValue(duration: null));
 
   int _textureId;
+  int _outPutChangeNumber;
+  // 如果出现buffer不可用，经过多久替换videoOutput的时间间隔，设置时间间隔大于等于1.0.小于1.0或者不设置均按照1.0设置
+  double outPutChangeIntervalSecond;
+
+  // copyBufferTimeOut，Try to replace videoOutput`s count.
+  // ignore: public_member_api_docs
+  int get outPutChangeNumber => _outPutChangeNumber;
 
   // ignore: public_member_api_docs
   final double timeout = 3.0; //TODO
@@ -258,6 +265,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.asset,
           timeout: timeout,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
           asset: dataSource,
           package: package,
         );
@@ -267,6 +275,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           sourceType: DataSourceType.network,
           timeout: timeout,
           uri: dataSource,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
           formatHint: formatHint,
         );
         break;
@@ -274,6 +283,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.file,
           timeout: timeout,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
           uri: dataSource,
         );
         break;
@@ -324,6 +334,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         case VideoEventType.copyPixelBufferTimeout:
           //TODO
           print('copyPixelBufferTimeout');
+          break;
+        case VideoEventType.outPutLayerChange:
+          _outPutChangeNumber = event.outPutLayerChangeNumber ?? 0;
           break;
         case VideoEventType.unknown:
           break;

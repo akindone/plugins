@@ -27,6 +27,7 @@ class CreateMessage {
   String packageName;
   String formatHint;
   double timeout;
+  double outPutChangeIntervalSecond;
 
   // ignore: unused_element
   Map<dynamic, dynamic> _toMap() {
@@ -36,6 +37,7 @@ class CreateMessage {
     pigeonMap['packageName'] = packageName;
     pigeonMap['formatHint'] = formatHint;
     pigeonMap['timeout'] = timeout;
+    pigeonMap['outPutChangeIntervalSecond'] = outPutChangeIntervalSecond;
     return pigeonMap;
   }
 
@@ -47,6 +49,7 @@ class CreateMessage {
     result.packageName = pigeonMap['packageName'];
     result.formatHint = pigeonMap['formatHint'];
     result.timeout = pigeonMap['timeout'];
+    result.outPutChangeIntervalSecond = pigeonMap['outPutChangeIntervalSecond'];
     return result;
   }
 }

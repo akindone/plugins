@@ -29,6 +29,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   Future<int> create(DataSource dataSource) async {
     CreateMessage message = CreateMessage();
     message.timeout = dataSource.timeout;
+    message.outPutChangeIntervalSecond = dataSource.outPutChangeIntervalSecond;
     //print('message.timeout=${message.timeout}');
 
     switch (dataSource.sourceType) {
@@ -118,6 +119,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           return VideoEvent(eventType: VideoEventType.bufferingEnd);
         case 'copyPixelBufferTimeout':
           return VideoEvent(eventType: VideoEventType.copyPixelBufferTimeout);
+        case 'outPutLayerChangeNumber':
+          return VideoEvent(
+              eventType: VideoEventType.outPutLayerChange,
+              outPutLayerChangeNumber: map['value']?.toInt() ?? 0);
         default:
           return VideoEvent(eventType: VideoEventType.unknown);
       }

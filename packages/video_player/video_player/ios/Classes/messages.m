@@ -88,6 +88,10 @@ static NSDictionary* wrapResult(NSDictionary *result, FlutterError *error) {
   if ([num isKindOfClass:[NSNumber class]]) {
     result.timeout = num.doubleValue;
   }
+  NSNumber *changeSecond = dict[@"outPutChangeIntervalSecond"];
+  if ([changeSecond isKindOfClass:[NSNumber class]]) {
+    result.outPutChangeIntervalSecond = changeSecond.floatValue;
+  }
   return result;
 }
 -(NSDictionary*)toMap {
