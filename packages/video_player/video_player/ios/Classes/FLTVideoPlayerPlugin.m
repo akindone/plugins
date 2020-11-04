@@ -37,7 +37,12 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 }
 @end
 
-@interface FLTVideoPlayer : NSObject <FlutterTexture, FlutterStreamHandler>
+@interface FLTVideoPlayer : NSObject <FlutterTexture, FlutterStreamHandler>{
+    int _bufferChangeNum;
+    NSTimeInterval _lastBufferTime;
+    bool _isPlayComplate;
+    NSTimeInterval _outPutChangeIntervalSecond;
+}
 @property(readonly, nonatomic) AVPlayer* player;
 @property(readonly, nonatomic) AVPlayerItemVideoOutput* videoOutput;
 @property(readonly, nonatomic) CADisplayLink* displayLink;
@@ -64,13 +69,17 @@ static void* playbackBufferEmptyContext = &playbackBufferEmptyContext;
 static void* playbackBufferFullContext = &playbackBufferFullContext;
 
 @implementation FLTVideoPlayer
-- (instancetype)initWithAsset:(NSString*)asset frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout {
+- (instancetype)initWithAsset:(NSString*)asset frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout outPutChangeIntervalSecond:(NSTimeInterval)outPutChangeIntervalSecond {
   NSString* path = [[NSBundle mainBundle] pathForResource:asset ofType:nil];
-  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater timeout:timeout];
+  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater timeout:timeout outPutChangeIntervalSecond: outPutChangeIntervalSecond];
 }
 
-- (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout {
+- (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater timeout:(NSTimeInterval)timeout outPutChangeIntervalSecond:(NSTimeInterval)outPutChangeIntervalSecond {
     AVPlayerItem* item = [AVPlayerItem playerItemWithURL:url];
+    _outPutChangeIntervalSecond = outPutChangeIntervalSecond;
+    if(_outPutChangeIntervalSecond < 1.0) {
+        _outPutChangeIntervalSecond = 1.0;
+    }
     if (self = [self initWithPlayerItem:item frameUpdater:frameUpdater]) {
         self.pixelBufferTimeout = timeout;
     }
@@ -111,6 +120,7 @@ static void* playbackBufferFullContext = &playbackBufferFullContext;
     AVPlayerItem* p = [notification object];
     [p seekToTime:kCMTimeZero completionHandler:nil];
   } else {
+    _isPlayComplate = true;
     if (_eventSink) {
       _eventSink(@{@"event" : @"completed"});
     }
@@ -203,6 +213,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   _isInitialized = false;
   _isPlaying = false;
   _disposed = false;
+  _lastBufferTime = 0;
+  _bufferChangeNum = 0;
+  _isPlayComplate = false;
 
   AVAsset* asset = [item asset];
   void (^assetCompletionHandler)(void) = ^{
@@ -241,7 +254,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   [self addObservers:item];
 
   [asset loadValuesAsynchronouslyForKeys:@[ @"tracks" ] completionHandler:assetCompletionHandler];
-
+  if (_eventSink) {
+    _eventSink(@{@"event" : @"outPutLayerChangeNumber",@"value": @(-1)});
+  }
   return self;
 }
 
@@ -400,13 +415,36 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   _player.volume = (float)((volume < 0.0) ? 0.0 : ((volume > 1.0) ? 1.0 : volume));
 }
 
+- (void)changeOutPlayer {
+  _bufferChangeNum++;
+  if (_eventSink) {
+      _eventSink(@{@"event" : @"outPutLayerChangeNumber",@"value": @(_bufferChangeNum)});
+  }
+  NSDictionary* pixBuffAttributes = @{
+    (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
+    (id)kCVPixelBufferIOSurfacePropertiesKey : @{}
+  };
+  _videoOutput = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:pixBuffAttributes];
+  [_player.currentItem addOutput:_videoOutput];
+}
+
 - (CVPixelBufferRef)copyPixelBuffer {
   CMTime outputItemTime = [_videoOutput itemTimeForHostTime:CACurrentMediaTime()];
+    NSTimeInterval nowTime = [[NSDate date] timeIntervalSince1970];
   if ([_videoOutput hasNewPixelBufferForItemTime:outputItemTime]) {
+      _lastBufferTime = nowTime;
+      _bufferChangeNum = 0;
+      if (_eventSink) {
+      _eventSink(@{@"event" : @"outPutLayerChangeNumber",@"value": @(_bufferChangeNum)});
+  }
 //      NSLog(@"copyPixelBuffer hasNew, %@", self.player.currentItem);
       _pixelBufferTimeoutTimer.fireDate = [NSDate distantFuture];
       return [_videoOutput copyPixelBufferForItemTime:outputItemTime itemTimeForDisplay:NULL];
   } else {
+      if (nowTime-_lastBufferTime > _outPutChangeIntervalSecond && !_isPlayComplate) {
+          _lastBufferTime = nowTime;
+          [self changeOutPlayer];
+      }
 //      NSLog(@"copyPixelBuffer NULL, %@", self.player.currentItem);
     return NULL;
   }
@@ -536,6 +574,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   FLTFrameUpdater* frameUpdater = [[FLTFrameUpdater alloc] initWithRegistry:_registry];
   FLTVideoPlayer* player;
   NSTimeInterval timeout = input.timeout;
+  NSTimeInterval outPutChangeIntervalSecond = input.outPutChangeIntervalSecond;
   if (input.asset) {
     NSString* assetPath;
     if (input.packageName) {
@@ -543,11 +582,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     } else {
       assetPath = [_registrar lookupKeyForAsset:input.asset];
     }
-    player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater timeout:timeout];
+    player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater timeout:timeout outPutChangeIntervalSecond: outPutChangeIntervalSecond];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
       
   } else if (input.uri) {
-    player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri] frameUpdater:frameUpdater timeout:timeout];
+    player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri] frameUpdater:frameUpdater timeout:timeout outPutChangeIntervalSecond: outPutChangeIntervalSecond];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
       
   } else {

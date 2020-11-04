@@ -152,6 +152,7 @@ class DataSource {
     this.formatHint,
     this.asset,
     this.package,
+    this.outPutChangeIntervalSecond,
   });
 
   /// The way in which the video was originally loaded.
@@ -179,6 +180,9 @@ class DataSource {
 
   // ignore: public_member_api_docs
   final double timeout;
+
+  // ignore: public_member_api_docs
+  final double outPutChangeIntervalSecond;
 }
 
 /// The way in which the video was originally loaded.
@@ -224,6 +228,7 @@ class VideoEvent {
     this.duration,
     this.size,
     this.buffered,
+    this.outPutLayerChangeNumber = 0,
   });
 
   /// The type of the event.
@@ -243,6 +248,9 @@ class VideoEvent {
   ///
   /// Only used if [eventType] is [VideoEventType.bufferingUpdate].
   final List<DurationRange> buffered;
+
+  // ignore: public_member_api_docs
+  final int outPutLayerChangeNumber;
 
   @override
   bool operator ==(Object other) {
@@ -285,6 +293,10 @@ enum VideoEventType {
 
   /// copyPixelBuffer timeout .
   copyPixelBufferTimeout,
+
+  //outPutLayerChange.
+  // ignore: public_member_api_docs
+  outPutLayerChange,
 
   /// An unknown event has been received.
   unknown,
