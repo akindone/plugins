@@ -1,3 +1,12 @@
+## 4.1.0+1
+
+* update `video_player_platform_interface.dart`
+  * `VideoEvent` add `outPutLayerChangeNumber`
+  * `DataSource` add `outPutChangeIntervalSecond`
+  * `VideoEventType` add `outPutLayerChange`
+* update `messages.dart`
+  * `CreateMessage` add `outPutChangeIntervalSecond`
+
 ## 4.1.0
 
 * Add `httpHeaders` to `DataSource`

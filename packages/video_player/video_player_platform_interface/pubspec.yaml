@@ -3,7 +3,8 @@ description: A common platform interface for the video_player plugin.
 homepage: https://github.com/flutter/plugins/tree/master/packages/video_player/video_player_platform_interface
 # NOTE: We strongly prefer non-breaking changes, even at the expense of a
 # less-clean API. See https://flutter.dev/go/platform-interface-breaking-changes
-version: 4.1.0
+version: 4.1.0+1
+publish_to: http://47.111.166.90:8081
 
 dependencies:
   flutter:

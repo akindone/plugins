@@ -11,15 +11,16 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
+import 'src/closed_caption_file.dart';
+
 export 'package:video_player_platform_interface/video_player_platform_interface.dart'
     show DurationRange, DataSourceType, VideoFormat, VideoPlayerOptions;
 
-import 'src/closed_caption_file.dart';
 export 'src/closed_caption_file.dart';
 
 final VideoPlayerPlatform _videoPlayerPlatform = VideoPlayerPlatform.instance
-  // This will clear all open videos on the platform when a full restart is
-  // performed.
+// This will clear all open videos on the platform when a full restart is
+// performed.
   ..init();
 
 /// The duration, current position, buffering state, error state and settings
@@ -264,6 +265,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static const int kUninitializedTextureId = -1;
   int _textureId = kUninitializedTextureId;
 
+  int? _outPutChangeNumber;
+
+  /// for iOS:如果出现buffer不可用，经过多久替换videoOutput的时间间隔，设置时间间隔大于等于1.0.小于1.0或者不设置均按照1.0设置
+  double outPutChangeIntervalSecond = 1.0;
+
+  /// copyBufferTimeOut，Try to replace videoOutput`s count.
+  int? get outPutChangeNumber => _outPutChangeNumber;
+
   /// This is just exposed for testing. It shouldn't be used by anyone depending
   /// on the plugin.
   @visibleForTesting
@@ -282,6 +291,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           sourceType: DataSourceType.asset,
           asset: dataSource,
           package: package,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
         );
         break;
       case DataSourceType.network:
@@ -290,12 +300,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           uri: dataSource,
           formatHint: formatHint,
           httpHeaders: httpHeaders,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
         );
         break;
       case DataSourceType.file:
         dataSourceDescription = DataSource(
           sourceType: DataSourceType.file,
           uri: dataSource,
+          outPutChangeIntervalSecond: outPutChangeIntervalSecond,
         );
         break;
     }
@@ -339,6 +351,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
         case VideoEventType.bufferingEnd:
           value = value.copyWith(isBuffering: false);
+          break;
+        case VideoEventType.outPutLayerChange:
+          _outPutChangeNumber = event.outPutLayerChangeNumber ?? 0;
           break;
         case VideoEventType.unknown:
           break;

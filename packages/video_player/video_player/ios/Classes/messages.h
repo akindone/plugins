@@ -24,6 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface FLTCreateMessage : NSObject
+@property(nonatomic, assign) NSTimeInterval outPutChangeIntervalSecond;
 @property(nonatomic, copy, nullable) NSString *asset;
 @property(nonatomic, copy, nullable) NSString *uri;
 @property(nonatomic, copy, nullable) NSString *packageName;
