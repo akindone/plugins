@@ -1,3 +1,7 @@
+## 2.0.0+1
+
+* Updated video_player_platform_interface version to 4.1.0+1
+
 ## 2.0.0
 
 * Migrate to null safety.

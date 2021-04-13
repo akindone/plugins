@@ -28,7 +28,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   @override
   Future<int?> create(DataSource dataSource) async {
     CreateMessage message = CreateMessage();
-
+    message.outPutChangeIntervalSecond = dataSource.outPutChangeIntervalSecond;
     switch (dataSource.sourceType) {
       case DataSourceType.asset:
         message.asset = dataSource.asset;
@@ -124,6 +124,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           return VideoEvent(eventType: VideoEventType.bufferingStart);
         case 'bufferingEnd':
           return VideoEvent(eventType: VideoEventType.bufferingEnd);
+        case 'outPutLayerChangeNumber':
+          return VideoEvent(
+              eventType: VideoEventType.outPutLayerChange,
+              outPutLayerChangeNumber: map['value']?.toInt() ?? 0);
         default:
           return VideoEvent(eventType: VideoEventType.unknown);
       }

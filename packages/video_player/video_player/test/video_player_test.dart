@@ -71,6 +71,12 @@ class FakeController extends ValueNotifier<VideoPlayerValue>
 
   @override
   VideoPlayerOptions? get videoPlayerOptions => null;
+
+  @override
+  double outPutChangeIntervalSecond = 1.0;
+
+  @override
+  int? get outPutChangeNumber => null;
 }
 
 Future<ClosedCaptionFile> _loadClosedCaption() async =>

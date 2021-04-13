@@ -152,6 +152,7 @@ class DataSource {
     this.asset,
     this.package,
     this.httpHeaders = const {},
+    this.outPutChangeIntervalSecond = 0,
   });
 
   /// The way in which the video was originally loaded.
@@ -181,6 +182,9 @@ class DataSource {
   /// The package that the asset was loaded from. Only set for
   /// [DataSourceType.asset] videos.
   final String? package;
+
+  /// for iOS:如果出现buffer不可用，经过多久替换videoOutput的时间间隔
+  final double outPutChangeIntervalSecond;
 }
 
 /// The way in which the video was originally loaded.
@@ -226,6 +230,7 @@ class VideoEvent {
     this.duration,
     this.size,
     this.buffered,
+    this.outPutLayerChangeNumber = 0,
   });
 
   /// The type of the event.
@@ -246,6 +251,9 @@ class VideoEvent {
   /// Only used if [eventType] is [VideoEventType.bufferingUpdate].
   final List<DurationRange>? buffered;
 
+  /// for iOS: outPutLayerChangeNumber.
+  final int? outPutLayerChangeNumber;
+
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -254,7 +262,8 @@ class VideoEvent {
             eventType == other.eventType &&
             duration == other.duration &&
             size == other.size &&
-            listEquals(buffered, other.buffered);
+            listEquals(buffered, other.buffered) &&
+            outPutLayerChangeNumber == other.outPutLayerChangeNumber;
   }
 
   @override
@@ -262,7 +271,8 @@ class VideoEvent {
       eventType.hashCode ^
       duration.hashCode ^
       size.hashCode ^
-      buffered.hashCode;
+      buffered.hashCode ^
+      outPutLayerChangeNumber.hashCode;
 }
 
 /// Type of the event.
@@ -284,6 +294,9 @@ enum VideoEventType {
 
   /// The video stopped to buffer.
   bufferingEnd,
+
+  /// for iOS:outPutLayerChange.
+  outPutLayerChange,
 
   /// An unknown event has been received.
   unknown,

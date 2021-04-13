@@ -94,6 +94,10 @@ static NSDictionary<NSString *, id> *wrapResult(NSDictionary *result, FlutterErr
   if ((NSNull *)result.httpHeaders == [NSNull null]) {
     result.httpHeaders = nil;
   }
+  NSNumber *changeSecond = dict[@"outPutChangeIntervalSecond"];
+  if ([changeSecond isKindOfClass:[NSNumber class]]) {
+    result.outPutChangeIntervalSecond = changeSecond.floatValue;
+  }
   return result;
 }
 - (NSDictionary *)toMap {

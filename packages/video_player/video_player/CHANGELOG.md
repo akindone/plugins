@@ -1,6 +1,7 @@
 ## 2.1.1+1
 
 * Android: set flag to ignore edit lists for fixing the issue: part of the media is unexpectedly missing or repeated.
+* iOS: add `outPutChangeNumber`,`outPutChangeIntervalSecond` to retry when copyBufferTimeOut
 
 ## 2.1.1
 
