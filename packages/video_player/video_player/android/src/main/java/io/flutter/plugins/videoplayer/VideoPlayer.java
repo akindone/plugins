@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Player.EventListener;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -38,6 +39,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.google.android.exoplayer2.extractor.mp4.FragmentedMp4Extractor;
+import com.google.android.exoplayer2.extractor.mp4.Mp4Extractor;
 
 final class VideoPlayer {
   private static final String FORMAT_SS = "ss";
@@ -146,7 +149,10 @@ final class VideoPlayer {
         return new HlsMediaSource.Factory(mediaDataSourceFactory)
             .createMediaSource(MediaItem.fromUri(uri));
       case C.TYPE_OTHER:
-        return new ProgressiveMediaSource.Factory(mediaDataSourceFactory)
+        DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
+        extractorsFactory.setMp4ExtractorFlags(Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS);
+        extractorsFactory.setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS);
+        return new ProgressiveMediaSource.Factory(mediaDataSourceFactory, extractorsFactory)
             .createMediaSource(MediaItem.fromUri(uri));
       default:
         {
